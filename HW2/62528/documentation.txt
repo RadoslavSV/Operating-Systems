@@ -1,0 +1,58 @@
+- Full documentation about "main.c" file (i.e. theoretical solution to the problem):
+-- Homework #2, Operating Systems, FMI
+--- Radoslav Velkov, SE, group 1, FN: 62528
+
+----------------------------------------------------------------------------------------------
+
+0) Initially, include some basic header files (libraries) that are required in order to use some system and library calls:
+<stdio.h>; <stdint.h>; <err.h>; <stdlib.h>; <unistd.h>; <fcntl.h>; <sys/stat.h>; <string.h>.
+
+1) The main program has two arguments passed to it. Count of arguments (including the name of the program) - argc, and a vector consisting of those arguments - argv[].
+
+2) The very first important step of the program is to check if the passed argument is exactly one. This means that the argc parameter should be equal to the number 2.
+If it's not - the program ends with an error and outputs corresponding message on the STDERR.
+
+3) After that, we use an integer variable (named "fd1"), that will serve as a file descriptor. Its value becomes the return value of the "open" function that received the name of the
+file (argv[1]) and flag O_RDONLY (meaning we use the file only for reading). /Check for error - if the return value is -1 and do accordingly./
+
+4) The task description says that each given file must begin with three ASCII letters 'O', 'R', 'C'. Therefore, we read them and store them into a char array of size 4.
+The fourth character is the terminating null. Then using strcmp function, compare that char array to the string "ORC". If they are not exactly the same, then the program does not
+continue below, because the given file does not count as a valid .orc file (does not begin with the magic word "ORC").
+
+5) The we have to retrieve the so called "ram_size", that we are able to use, from that file. Since it's of uint32_t type, this means that it's exacltly the next 4 bytes (after ORC).
+Declare such uint32_t variable "ram_size" and read once that much bytes at once (4 bytes). Now we have ram we will be using. /Check for failures of the read function./
+
+6) Declare an array (sequence of "boxes") of type int64_t (according to the task) called "arr", having exactly ram_size boxes.
+(int64_t arr[ram_size];)
+
+7) Then we have to retrieve the size of the given file (program to operate on). Do it with the help of the stat function. Pass the name of the file as first argument and 
+the address of the newly declared structure ("s") as second. /Check for errors./ The size in bytes of the file is the value of the "st_size" variable of that struct. 
+!!For the purpose of our task, we extract 7 bytes of it (the first 7 in the program) and then divide the result by 25 (because each "instruction" is exactly 25 bytes big).
+(int sz = (s.st_size-7)/25;)
+Now we know how many "instructions" we have to read from the file - exactly "sz" instructions.
+An additional check here: the size of the file minus 7 must be divisible by 25. Otherwise, the last instruction in the program will not have enough operands to work with.
+
+8) Declare a uint8_t (1 byte) variable "opcode", that retrieves the opcode of each instruction. And declare three int64_t (8 bytes) variable for the three preceeding operands
+(op1, op2, op3).
+
+9) Use a "for" loop to go through the whole file ("program"). Iterate exactly "sz" times.
+For each iteration, begin with 4 consecutive read sys calls - the first one for the opcode and the next three for the three operands. /With errors check/
+
+10) After that, use 12 consecutive "if" operators. Each one check the read opcode and compares it to a certain hex number
+(all 12 of those hex numbers are the respective opcodes of the possible instructions). Exactly one instruction can be executed during a single iteration of the loop,
+due to using "if {} else if {} ...". Each instruction operates differently with the array and with the program itself, according to the given task.
+
+/All 12 instructions have error checks which include: check if the instruction tries to access not allowed memory
+(for example: an operand greater than ram_size is used as an index of the array); check division by zero; fail of certain function (write, lseek, sleep, etc.)/
+
+At the end of the "if else" operators, if the opcode hasn't matched a hex number for valid instruction, the program ends with an error exaplaining to the user that it received
+an invalid opcode. 
+
+11) After the "for" loop has concluded, we close the initially opened file descriptor (fd1) with the "close" system call. /Check if it was executed correctly by not returning -1/
+
+12) Exit the program with exit code 0 - meaning it has been executed successfully.
+
+----------------------------------------------------------------------------------------------
+
+-- I have not used any sources from the internet for completing this task.
+- All methods and tools I have used in the "main.c" file are retrieved from the practicums in FMI and from the manual pages of the used system and library calls in C.
