@@ -1,0 +1,97 @@
+- Full documentation about 'unpack.sh' file (i.e. theoretical solution to the problem):
+-- Homework #1, Operating Systems, FMI
+--- Radoslav Velkov, SE, group 1, FN: 62528
+
+----------------------------------------------------------------------------------------------
+!!! NB! The script works slowly. It needs about 5-7 seconds to finish, after being executed!
+
+0) Start with the inevitable header - the shebang. (#!/bin/bash)   //the shell that will execute the script
+
+The script receives 4 arguments:
+- The first one is the given (already existing) .zip file that contains the whole data and has to be unzipper.
+- The second parameter is path of a directory that has to be created, thus using command: mkdir -p [path] 
+(the flag -p is used to create the needed parent directories to the end if unexisting). 
+This directory will be used to store the students' submitted archives.
+	(man mkdir)
+- The third one is again a directory (path) which has to be created as well. Therefore again the same command.
+That directory will store the "failed/unsuccessful/unfinished" works of students (those who differ from the strict needed pattern).
+- The fourth and final argument is an unexisting path of file (type .txt for example), which our script will create.
+The used command is "touch", which creates an empty temporary file in the system.
+
+1) The first step is to unzip the given file (which is the first parameter of the script) with "unzip" command with flag '-d' 
+(which gives the option to immediately give a directory in which the archive will be unzipped).
+	(man unzip)
+"&>/dev/null" redirects both stdout(1) and stderr(2) outputs to /dev/null, which is just like a trash bin for all unwanted messages for errors.
+
+2) Then, the scripts begins searching through the files of the directory given as second argument.
+Main command: "find".
+Flags: -mindepth and -maxdepth with parameter '1' -> in order to restrict the depth of the searching to only the first level;
+	   -printf -> pass the wanted format in which the found data will be printed ("%p\n" sites that only the path of the found file will be printed with a newline after that);
+	"2>/dev/null", analogically, redirects only the stderr's text into the "dump".
+The output of the find command is going to be a large number of paths divided by newlines.
+Using pipe '|' we pass the output of the left commandline as input to the right one.
+In this case the right command is "while", which is a loop, with the condition "read", which is an interactive command, but this way it automatically receives input
+from the output of the command before the pipe. It uses a variable (named "n" here) in which to store the current value.
+	(man find)   (man read)
+Then in the scope of the loop, the used command is "mv", which stands for "move", but is used for "renaming" files as well.
+It uses two parameters - the first one is the source which we want to rename and the second one - the new "name" (which actually is just the new path). 
+The first arg. is the found, then read and then stored into 'n' directory. It will be renamed exactly as the Faculty number of the certain student. 
+We retrieve the exact FN of a student from its directory from the given archive. 
+As the task description says: 
+	- each directory name in the archive starts with the faculty number of the student followed by a hyphen '-'.
+For the second parameter of the 'mv' command I concatenate the output of the "dirname $n" command (which returns the directory of the given file) then a slash '/' 
+(to continue reading it as a path) and then the output of the command in which we print the value of n, and with "sed" (-r for RegEx) substitute the matched pattern of the whole name
+(defining the FN in it as an atom) with only that atom.
+This way we get the exact faculty numbers of the students and move(rename) their works into directories of those names.
+
+3) If an archive has wrong format, that student's directory must be copied into the third parameter of the script directory (which is for unsuccessful jobs).
+With a pipeline consisting of "find", then inverse "grep" (flag: -v) to sort only those with wrong format, and then "while read .." we are able to create
+the needed directory (again named after the student's FN) into the 3rd directory and then copy the found "wrong" archive there.
+
+4) With similar construction to the above, I fulfill the other requirement for an archive to be copied into the 3rd folder.
+That being if the files submitted in "moodle" are more than one.
+First the script searches through all directories in the 2nd main dir. and for each of these, it counts the number of files in it.
+If that number is greater than 1 ([ $(...|wc -l) -gt 1 ]), then analogically the file is copied.
+
+5) The fourth parameter file (which from now on I will refer to as "results file") must have one row for each student's faculty number.
+I search through all of the directories in the 2nd dir. and get their basenames and write them into the results file (cmd: basename ... >> [file]).
+After it's done, sort the whole file numerically (-n) and write the result into itself (-o for "output" into passed file) (cmd: sort -n -o [file] [the same file]).
+	(man sort)
+
+6) Get the names of the contents of 2nd main dir with %P in printf. Write them into a temporary file "pesho". Sort "pesho" by FN.
+Create another temporary file "goshu". With the cut command retrieve only the second field of each row of "pesho" and write them into "goshu".
+Then using "paste" we concatenate two files' rows one by one, which will help us check the name of the archive.
+Use a variable "fn" for better understanding. And then check two statements - if the FN is the one that it should be AND if the archive name is right.
+If so, add '0' into the corresponding row in the results file (using sed inplace (flag: -i) to write directly into the given file).
+Otherwise, add '1' in the same manner.
+Eventually, delete both "pesho" and "goshu", so they do not stay unwanted in the main filesystem.
+	(man cut)    (man paste)    (man sed)
+
+7) Checking whether the second digit will be 0 or 1 for each FN is the following:
+In one variable extract the FN; in another one extract the output of "file" command for each of the archives in the 2nd dir.
+Check if that output matches the pattern of "XZ compressed data", then the file has right format and again with sed -i write 0 in the results file (1, otherwise).
+	(man file)
+
+8) Fulfilling the third criteria for copying a directory into the "unfinished/failed" main dir. - wrong exit code extracting the tar:
+tar -xf [archive] -C [destination] to extract the tar into a passed destination. If that exit code is not 0 (.. -gt 0]), then we copy...
+Meanwhile the tar ... command here exctracts all archives into the corresponding directory.
+	(man tar)
+
+Continue writing the third and the fourth columns in the results file:
+9) Check if there is a directory present in the archive by counting the number of files after extracting.
+Then using if operator to check if that number is greater than 0. And so on..
+
+10) Check if the name of directory is right, according to the faculty number by comparing strings. The other is analogical.
+
+11) Get everything from the 2nd dir. and then using process substitution grep only those that have .tar or .zip in their names and pass each one of them as argument to "rm -r"
+(-r for recursive removal) in order to delete all types of archives. By that point, everything possible has been extracted and those archives are no longer useful.
+
+12) Copy (recursively) directories with exact depth 2 into the FN_name directory for each student (for better reading).
+(Only those who match RegEx pattern of starting with a number, because others cannot be faculty numbers).
+
+13) And to finish clearing unnessessary leftovers, delete all directories from level 2 and below in the 2nd dir. (since we already have everything needed in each dir. of each FN).
+
+----------------------------------------------------------------------------------------------
+
+-- I have not used any sources from the internet for completing this task.
+- All methods and tools I have used in 'unpack.sh' file are retrieved from the practicums in FMI and from the manual pages of the used commands.
